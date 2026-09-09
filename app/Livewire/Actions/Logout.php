@@ -2,21 +2,21 @@
 
 namespace App\Livewire\Actions;
 
-use Illuminate\Support\Facades\Auth;
+use App\Services\PortalData\PortalAuthGateway;
 use Illuminate\Support\Facades\Session;
 
 class Logout
 {
     /**
-     * Log the current user out of the application.
+     * Cierra sesión Laravel y, si aplica, invalida el JWT del API.
      */
     public function __invoke()
     {
-        Auth::guard('web')->logout();
+        app(PortalAuthGateway::class)->logout();
 
         Session::invalidate();
         Session::regenerateToken();
 
-        return redirect('/');
+        return redirect()->route('login');
     }
 }

@@ -1,133 +1,151 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth">
     <head>
         @include('partials.head')
     </head>
-    <body class="min-h-screen bg-white dark:bg-zinc-800">
-        <flux:sidebar sticky stashable class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
-            <flux:sidebar.toggle class="lg:hidden" icon="x-mark" />
-
-            <a href="{{ route('dashboard') }}" class="me-5 flex items-center space-x-2 rtl:space-x-reverse" wire:navigate>
-                <x-app-logo />
+    <body class="portal-liquid-root min-h-screen bg-portal-canvas text-portal-ink antialiased">
+        <flux:header sticky class="portal-top-nav">
+            <a
+                href="{{ route('dashboard') }}"
+                class="me-4 flex shrink-0 items-center py-1 transition-opacity portal-transition-fast hover:opacity-90 sm:me-6"
+                wire:navigate
+            >
+                <img
+                    src="{{ asset('images/logoWhiteTDG.png') }}"
+                    alt="{{ config('app.name', 'Laravel') }}"
+                    width="200"
+                    height="64"
+                    class="h-8 w-auto max-w-[10rem] object-contain object-left sm:h-9 sm:max-w-[11rem]"
+                />
             </a>
 
-            <flux:navlist variant="outline">
-                <flux:navlist.group :heading="__('Platform')" class="grid">
-                    <flux:navlist.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>{{ __('Dashboard') }}</flux:navlist.item>
-                </flux:navlist.group>
-            </flux:navlist>
-
             <flux:spacer />
 
-            <flux:navlist variant="outline">
-                <flux:navlist.item icon="folder-git-2" href="https://github.com/laravel/livewire-starter-kit" target="_blank">
-                {{ __('Repository') }}
-                </flux:navlist.item>
+            <x-portal.nav-pills />
 
-                <flux:navlist.item icon="book-open-text" href="https://laravel.com/docs/starter-kits#livewire" target="_blank">
-                {{ __('Documentation') }}
-                </flux:navlist.item>
-            </flux:navlist>
+            <div class="portal-top-nav-actions ms-2 max-lg:hidden sm:ms-3">
+                <div class="portal-top-nav-action">
+                    <x-portal.theme-switcher inline />
+                </div>
 
-            <!-- Desktop User Menu -->
-            <flux:dropdown class="hidden lg:block" position="bottom" align="start">
-                <flux:profile
-                    :name="auth()->user()->name"
-                    :initials="auth()->user()->initials()"
-                    icon:trailing="chevrons-up-down"
-                    data-test="sidebar-menu-button"
-                />
+                <div class="portal-top-nav-action">
+                    <flux:dropdown position="bottom" align="end" class="portal-top-nav-action-dropdown">
+                        <flux:profile
+                            :initials="auth()->user()->initials()"
+                            circle
+                            :chevron="false"
+                            data-test="top-nav-menu-button"
+                            class="portal-top-nav-profile cursor-pointer"
+                        />
 
-                <flux:menu class="w-[220px]">
-                    <flux:menu.radio.group>
-                        <div class="p-0 text-sm font-normal">
-                            <div class="flex items-center gap-2 px-1 py-1.5 text-start text-sm">
-                                <span class="relative flex h-8 w-8 shrink-0 overflow-hidden rounded-lg">
-                                    <span
-                                        class="flex h-full w-full items-center justify-center rounded-lg bg-neutral-200 text-black dark:bg-neutral-700 dark:text-white"
-                                    >
-                                        {{ auth()->user()->initials() }}
-                                    </span>
-                                </span>
-
-                                <div class="grid flex-1 text-start text-sm leading-tight">
-                                    <span class="truncate font-semibold">{{ auth()->user()->name }}</span>
-                                    <span class="truncate text-xs">{{ auth()->user()->email }}</span>
-                                </div>
-                            </div>
+                <flux:menu class="portal-user-menu portal-user-menu-glass !min-w-0 !w-56 max-w-56">
+                    <div class="portal-user-menu-user">
+                        <span class="portal-user-menu-user__avatar" aria-hidden="true">
+                            {{ auth()->user()->initials() }}
+                        </span>
+                        <div class="portal-user-menu-user__copy">
+                            <p class="portal-user-menu-user__name">{{ auth()->user()->name }}</p>
+                            <p class="portal-user-menu-user__email">{{ auth()->user()->email }}</p>
                         </div>
-                    </flux:menu.radio.group>
+                    </div>
 
-                    <flux:menu.separator />
+                    <flux:menu.separator class="portal-user-menu-separator portal-user-menu-separator--user" />
 
                     <flux:menu.radio.group>
-                        <flux:menu.item :href="route('profile.edit')" icon="cog" wire:navigate>{{ __('Settings') }}</flux:menu.item>
+                        <flux:menu.item class="portal-user-menu-item" :href="route('my-profile.show')" icon="user-circle" wire:navigate>{{ __('Mi Perfil') }}</flux:menu.item>
+                        <flux:menu.item class="portal-user-menu-item" :href="route('profile.edit')" icon="cog" wire:navigate>{{ __('Ajustes') }}</flux:menu.item>
                     </flux:menu.radio.group>
 
-                    <flux:menu.separator />
+                    <flux:menu.separator class="portal-user-menu-separator" />
 
                     <form method="POST" action="{{ route('logout') }}" class="w-full">
                         @csrf
-                        <flux:menu.item as="button" type="submit" icon="arrow-right-start-on-rectangle" class="w-full" data-test="logout-button">
-                            {{ __('Log Out') }}
+                        <flux:menu.item
+                            as="button"
+                            type="submit"
+                            icon="arrow-right-start-on-rectangle"
+                            class="portal-user-menu-item portal-user-menu-item-danger w-full"
+                            data-test="logout-button"
+                        >
+                            {{ __('Cerrar sesión') }}
                         </flux:menu.item>
                     </form>
                 </flux:menu>
-            </flux:dropdown>
-        </flux:sidebar>
+                    </flux:dropdown>
+                </div>
+            </div>
 
-        <!-- Mobile User Menu -->
-        <flux:header class="lg:hidden">
-            <flux:sidebar.toggle class="lg:hidden" icon="bars-2" inset="left" />
-
-            <flux:spacer />
-
-            <flux:dropdown position="top" align="end">
-                <flux:profile
-                    :initials="auth()->user()->initials()"
-                    icon-trailing="chevron-down"
-                />
-
-                <flux:menu>
-                    <flux:menu.radio.group>
-                        <div class="p-0 text-sm font-normal">
-                            <div class="flex items-center gap-2 px-1 py-1.5 text-start text-sm">
-                                <span class="relative flex h-8 w-8 shrink-0 overflow-hidden rounded-lg">
-                                    <span
-                                        class="flex h-full w-full items-center justify-center rounded-lg bg-neutral-200 text-black dark:bg-neutral-700 dark:text-white"
-                                    >
-                                        {{ auth()->user()->initials() }}
-                                    </span>
-                                </span>
-
-                                <div class="grid flex-1 text-start text-sm leading-tight">
-                                    <span class="truncate font-semibold">{{ auth()->user()->name }}</span>
-                                    <span class="truncate text-xs">{{ auth()->user()->email }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </flux:menu.radio.group>
-
-                    <flux:menu.separator />
-
-                    <flux:menu.radio.group>
-                        <flux:menu.item :href="route('profile.edit')" icon="cog" wire:navigate>{{ __('Settings') }}</flux:menu.item>
-                    </flux:menu.radio.group>
-
-                    <flux:menu.separator />
-
-                    <form method="POST" action="{{ route('logout') }}" class="w-full">
-                        @csrf
-                        <flux:menu.item as="button" type="submit" icon="arrow-right-start-on-rectangle" class="w-full" data-test="logout-button">
-                            {{ __('Log Out') }}
-                        </flux:menu.item>
-                    </form>
-                </flux:menu>
-            </flux:dropdown>
+            <div class="portal-top-nav-mobile ms-2 lg:hidden">
+                <x-portal.mobile-menu />
+            </div>
         </flux:header>
 
         {{ $slot }}
 
         @fluxScripts
+
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                const main = document.querySelector('.portal-main-inner');
+                if (!main) return;
+
+                const runEnter = () => {
+                    main.classList.remove('is-entering');
+                    void main.offsetWidth;
+                    main.classList.add('is-entering');
+                };
+
+                const initGlassInteractive = () => {
+                    const canTrackPointer = window.matchMedia('(pointer: fine)').matches;
+                    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+                    document.querySelectorAll('[data-glass-interactive]').forEach((el) => {
+                        if (el.dataset.glassBound === 'true') return;
+                        el.dataset.glassBound = 'true';
+
+                        if (!canTrackPointer || reduceMotion) return;
+
+                        el.addEventListener('pointermove', (event) => {
+                            const rect = el.getBoundingClientRect();
+                            const x = ((event.clientX - rect.left) / rect.width) * 100;
+                            const y = ((event.clientY - rect.top) / rect.height) * 100;
+                            el.style.setProperty('--glass-x', `${Math.max(0, Math.min(100, x))}%`);
+                            el.style.setProperty('--glass-y', `${Math.max(0, Math.min(100, y))}%`);
+                        });
+
+                        el.addEventListener('pointerleave', () => {
+                            el.style.setProperty('--glass-x', '50%');
+                            el.style.setProperty('--glass-y', '50%');
+                        });
+                    });
+                };
+
+                main.addEventListener('animationend', (e) => {
+                    if (e.animationName === 'portal-enter') {
+                        main.classList.remove('is-entering');
+                    }
+                });
+
+                runEnter();
+                initGlassInteractive();
+                document.addEventListener('livewire:navigated', runEnter);
+                document.addEventListener('livewire:navigated', initGlassInteractive);
+
+                document.addEventListener('livewire:navigated', () => {
+                    const mode = window.localStorage.getItem('flux.appearance');
+                    if (window.Flux && typeof window.Flux.applyAppearance === 'function') {
+                        window.Flux.applyAppearance(mode || 'system');
+                    }
+                });
+
+                window
+                    .matchMedia('(prefers-color-scheme: dark)')
+                    .addEventListener('change', () => {
+                        if (!window.localStorage.getItem('flux.appearance') && window.Flux?.applyAppearance) {
+                            window.Flux.applyAppearance('system');
+                        }
+                    });
+            });
+        </script>
     </body>
 </html>

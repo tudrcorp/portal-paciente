@@ -61,8 +61,8 @@ return [
 
     'providers' => [
         'users' => [
-            'driver' => 'eloquent',
-            'model' => env('AUTH_MODEL', App\Models\User::class),
+            'driver' => env('AUTH_PROVIDER_DRIVER', 'telemedicine_eloquent'),
+            'model' => env('AUTH_MODEL', App\Models\TelemedicinePatient::class),
         ],
 
         // 'users' => [

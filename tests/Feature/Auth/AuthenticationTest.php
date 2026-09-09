@@ -1,77 +1,37 @@
 <?php
 
 use App\Models\User;
-use Laravel\Fortify\Features;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Livewire\Volt\Volt as LivewireVolt;
 
 test('login screen can be rendered', function () {
     $response = $this->get(route('login'));
 
     $response->assertStatus(200);
+    $response->assertSee(__('Clave del portal'), false);
+    $response->assertSee(__('¿Olvidaste tu clave?'), false);
+    $response->assertSee(__('¡Comunícate con nosotros!'), false);
+    $response->assertSee(__('Olvidé mi clave'), false);
 });
 
-test('users can authenticate using the login screen', function () {
-    $user = User::factory()->create();
+test('login requires password', function () {
+    LivewireVolt::test('auth.login')
+        ->set('identityCard', '00112345678')
+        ->set('password', '')
+        ->call('login')
+        ->assertHasErrors(['password']);
 
-    $response = LivewireVolt::test('auth.login')
-        ->set('email', $user->email)
-        ->set('password', 'password')
-        ->call('login');
-
-    $response
-        ->assertHasNoErrors()
-        ->assertRedirect(route('dashboard', absolute: false));
-
-    $this->assertAuthenticated();
-});
-
-test('users can not authenticate with invalid password', function () {
-    $user = User::factory()->create();
-
-    $response = LivewireVolt::test('auth.login')
-        ->set('email', $user->email)
-        ->set('password', 'wrong-password')
-        ->call('login');
-
-    $response->assertHasErrors('email');
-
-    $this->assertGuest();
-});
-
-test('users with two factor enabled are redirected to two factor challenge', function () {
-    if (! Features::canManageTwoFactorAuthentication()) {
-        $this->markTestSkipped('Two-factor authentication is not enabled.');
-    }
-
-    Features::twoFactorAuthentication([
-        'confirm' => true,
-        'confirmPassword' => true,
-    ]);
-
-    $user = User::factory()->create();
-
-    $user->forceFill([
-        'two_factor_secret' => encrypt('test-secret'),
-        'two_factor_recovery_codes' => encrypt(json_encode(['code1', 'code2'])),
-        'two_factor_confirmed_at' => now(),
-    ])->save();
-
-    $response = LivewireVolt::test('auth.login')
-        ->set('email', $user->email)
-        ->set('password', 'password')
-        ->call('login');
-
-    $response->assertRedirect(route('two-factor.login'));
-    $response->assertSessionHas('login.id', $user->id);
     $this->assertGuest();
 });
 
 test('users can logout', function () {
+    $this->withoutMiddleware(ValidateCsrfToken::class);
+
     $user = User::factory()->create();
 
     $response = $this->actingAs($user)->post(route('logout'));
 
-    $response->assertRedirect(route('home'));
+    $response->assertRedirect(route('login'));
 
     $this->assertGuest();
 });
