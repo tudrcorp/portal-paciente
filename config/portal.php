@@ -71,4 +71,17 @@ return [
     'support_whatsapp_phone' => env('PORTAL_SUPPORT_WHATSAPP_PHONE', '+584242132112'),
     'support_whatsapp_name' => env('PORTAL_SUPPORT_WHATSAPP_NAME', 'MediChat'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Quality Control (cuestionario in-app por caso)
+    |--------------------------------------------------------------------------
+    |
+    | El cuestionario se responde dentro del portal (Documentos). No se usa
+    | Google Forms: las respuestas se asocian 1:1 al caso del paciente.
+    |
+    */
+    'quality_survey' => [
+        'required_before_case_documents' => true,
+    ],
+
 ];

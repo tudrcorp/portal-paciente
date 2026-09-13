@@ -1,12 +1,33 @@
 <x-layouts.app :title="__('Documentos')">
     @php
+    $qcContactChannels = \App\Http\Requests\StoreCaseQualitySurveyRequest::CONTACT_CHANNELS;
+    $qcServices = \App\Http\Requests\StoreCaseQualitySurveyRequest::SERVICES;
+    $qcSatisfaction = \App\Http\Requests\StoreCaseQualitySurveyRequest::SATISFACTION;
+    $qcDefaults = $qualitySurveyDefaults ?? [
+        'patient_identity_card' => '',
+        'patient_full_name' => '',
+    ];
+
     $searchPayload = [
         'total' => $summary['documents'] ?? 0,
         'month_labels' => collect($filterOptions['months'] ?? [])->pluck('label', 'value'),
+        'quality_survey_complete_url_template' => route('cases.quality-survey.complete', ['case' => '__CASE__']),
+        'quality_survey_defaults' => [
+            'patient_identity_card' => (string) ($qcDefaults['patient_identity_card'] ?? ''),
+            'patient_full_name' => (string) ($qcDefaults['patient_full_name'] ?? ''),
+        ],
+        'quality_survey_options' => [
+            'contact_channels' => $qcContactChannels,
+            'services' => $qcServices,
+            'satisfaction' => $qcSatisfaction,
+        ],
         'cases' => ($cases ?? collect())->map(fn (array $case): array => [
             'id' => $case['id'],
+            'code' => $case['code'] ?? null,
             'doctors' => $case['doctors'],
             'services' => $case['services'],
+            'reference_date_key' => (string) ($case['reference_date_key'] ?? ''),
+            'quality_survey_completed' => (bool) ($case['quality_survey_completed'] ?? false),
             'documents' => collect($case['documents'] ?? [])->map(fn (array $document): array => [
                 'uid' => $document['uid'] ?? md5(($document['source'] ?? '').'|'.($document['source_id'] ?? '').'|'.($document['file_path'] ?? '')),
                 'document_name' => (string) ($document['document_name'] ?? ''),
@@ -330,6 +351,151 @@
                 </div>
             </form>
         </flux:modal>
+
+            {{-- Modal Quality Control (formulario in-app obligatorio por caso) --}}
+            <template x-teleport="body">
+                <div
+                    class="portal-qc-survey"
+                    x-show="qcOpen"
+                    x-cloak
+                    style="display: none;"
+                    @keydown.escape.window="closeQualitySurvey()"
+                >
+                    <div
+                        class="portal-qc-survey__backdrop"
+                        x-show="qcOpen"
+                        x-transition.opacity.duration.200ms
+                        @click="closeQualitySurvey()"
+                    ></div>
+
+                    <div
+                        class="portal-qc-survey__sheet portal-qc-survey__sheet--form"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="portal-qc-survey-title"
+                        x-show="qcOpen"
+                        x-transition:enter="portal-qc-survey-enter"
+                        x-transition:enter-start="portal-qc-survey__sheet--enter"
+                        x-transition:enter-end="portal-qc-survey__sheet--entered"
+                        x-transition:leave="portal-qc-survey-leave"
+                        x-transition:leave-start="portal-qc-survey__sheet--entered"
+                        x-transition:leave-end="portal-qc-survey__sheet--enter"
+                        @click.stop
+                    >
+                        <div class="portal-qc-survey__handle" aria-hidden="true"></div>
+
+                        <header class="portal-qc-survey__header">
+                            <div>
+                                <p class="portal-qc-survey__eyebrow">{{ __('Control de calidad') }}</p>
+                                <h3 id="portal-qc-survey-title" class="portal-qc-survey__title">
+                                    {{ __('Cuestionario del servicio') }}
+                                </h3>
+                            </div>
+                            <button type="button" class="portal-qc-survey__close" @click="closeQualitySurvey()" aria-label="{{ __('Cerrar') }}">
+                                <flux:icon name="x-mark" class="size-5" />
+                            </button>
+                        </header>
+
+                        <form class="portal-qc-survey__form" @submit.prevent="submitQualitySurvey()">
+                            <p class="portal-qc-survey__copy">
+                                {{ __('Responde este cuestionario una sola vez por caso. Es obligatorio para ver y descargar los documentos.') }}
+                            </p>
+
+                            <div class="portal-qc-survey__case" x-show="qcCase">
+                                <p class="portal-qc-survey__case-label">{{ __('Caso') }}</p>
+                                <p class="portal-qc-survey__case-code font-mono" x-text="qcCase?.code || ('#' + (qcCase?.id || ''))"></p>
+                            </div>
+
+                            <div class="portal-qc-survey__fields">
+                                <label class="portal-qc-survey__field">
+                                    <span>{{ __('Fecha del servicio') }}</span>
+                                    <input type="date" x-model="qcForm.service_date" required>
+                                </label>
+
+                                <label class="portal-qc-survey__field">
+                                    <span>{{ __('Cédula del paciente') }}</span>
+                                    <input type="text" x-model="qcForm.patient_identity_card" autocomplete="off" required maxlength="30">
+                                </label>
+
+                                <label class="portal-qc-survey__field">
+                                    <span>{{ __('Nombre completo') }}</span>
+                                    <input type="text" x-model="qcForm.patient_full_name" autocomplete="name" required maxlength="160">
+                                </label>
+
+                                <fieldset class="portal-qc-survey__fieldset">
+                                    <legend>{{ __('Canal por el que te contactamos') }}</legend>
+                                    <template x-for="option in (payload.quality_survey_options?.contact_channels || [])" :key="'contact-' + option">
+                                        <label class="portal-qc-survey__choice">
+                                            <input type="radio" name="qc_contact_channel" :value="option" x-model="qcForm.contact_channel" required>
+                                            <span x-text="option === 'Other' ? '{{ __('Otro') }}' : option"></span>
+                                        </label>
+                                    </template>
+                                    <label class="portal-qc-survey__field" x-show="qcForm.contact_channel === 'Other'" x-cloak>
+                                        <span>{{ __('Especifica el canal') }}</span>
+                                        <input type="text" x-model="qcForm.contact_channel_other" maxlength="120" :required="qcForm.contact_channel === 'Other'">
+                                    </label>
+                                </fieldset>
+
+                                <label class="portal-qc-survey__field">
+                                    <span>{{ __('Servicio recibido') }}</span>
+                                    <select x-model="qcForm.service_received" required>
+                                        <option value="">{{ __('Selecciona una opción') }}</option>
+                                        <template x-for="option in (payload.quality_survey_options?.services || [])" :key="'service-' + option">
+                                            <option :value="option" x-text="option === 'Other' ? '{{ __('Otro') }}' : option"></option>
+                                        </template>
+                                    </select>
+                                </label>
+
+                                <label class="portal-qc-survey__field" x-show="qcForm.service_received === 'Other'" x-cloak>
+                                    <span>{{ __('Especifica el servicio') }}</span>
+                                    <input type="text" x-model="qcForm.service_received_other" maxlength="120" :required="qcForm.service_received === 'Other'">
+                                </label>
+
+                                <template x-for="rating in qcRatingFields" :key="rating.key">
+                                    <fieldset class="portal-qc-survey__fieldset">
+                                        <legend x-text="rating.label"></legend>
+                                        <template x-for="option in (payload.quality_survey_options?.satisfaction || [])" :key="rating.key + '-' + option">
+                                            <label class="portal-qc-survey__choice">
+                                                <input
+                                                    type="radio"
+                                                    :name="'qc_' + rating.key"
+                                                    :value="option"
+                                                    :checked="qcForm[rating.key] === option"
+                                                    @change="qcForm[rating.key] = option"
+                                                    required
+                                                >
+                                                <span x-text="option"></span>
+                                            </label>
+                                        </template>
+                                    </fieldset>
+                                </template>
+
+                                <label class="portal-qc-survey__field">
+                                    <span>{{ __('Sugerencias (opcional)') }}</span>
+                                    <textarea x-model="qcForm.suggestions" rows="3" maxlength="2000" placeholder="{{ __('Cuéntanos cómo podemos mejorar') }}"></textarea>
+                                </label>
+                            </div>
+
+                            <p class="portal-qc-survey__error" x-show="qcError" x-text="qcError" x-cloak></p>
+
+                            <div class="portal-qc-survey__actions">
+                                <button
+                                    type="submit"
+                                    class="portal-qc-survey__confirm"
+                                    :disabled="qcSubmitting"
+                                >
+                                    <span x-show="!qcSubmitting">{{ __('Enviar y ver documentos') }}</span>
+                                    <span x-show="qcSubmitting" x-cloak>{{ __('Guardando…') }}</span>
+                                </button>
+
+                                <button type="button" class="portal-qc-survey__cancel" @click="closeQualitySurvey()">
+                                    {{ __('Cancelar') }}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </template>
         @endif
     </div>
 
@@ -344,6 +510,30 @@
                 month: '',
                 dateFiltersOpen: false,
                 openCaseIds: {},
+                qcOpen: false,
+                qcCase: null,
+                qcError: '',
+                qcSubmitting: false,
+                qcForm: {
+                    service_date: '',
+                    patient_identity_card: '',
+                    patient_full_name: '',
+                    contact_channel: '',
+                    contact_channel_other: '',
+                    service_received: '',
+                    service_received_other: '',
+                    rating_attention_channels: '',
+                    rating_response_time: '',
+                    rating_medical_service: '',
+                    rating_overall_satisfaction: '',
+                    suggestions: '',
+                },
+                qcRatingFields: [
+                    { key: 'rating_attention_channels', label: '{{ __('Calificación de los canales de atención') }}' },
+                    { key: 'rating_response_time', label: '{{ __('Calificación del tiempo de respuesta') }}' },
+                    { key: 'rating_medical_service', label: '{{ __('Calificación del servicio médico') }}' },
+                    { key: 'rating_overall_satisfaction', label: '{{ __('Satisfacción general') }}' },
+                ],
 
                 init() {
                     ['query', 'dateFrom', 'dateTo', 'year', 'month'].forEach((key) => {
@@ -351,6 +541,172 @@
                             this.openCaseIds = {};
                         });
                     });
+                },
+
+                csrfToken() {
+                    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+                        || document.querySelector('input[name="_token"]')?.value
+                        || '';
+                },
+
+                caseById(caseId) {
+                    const id = Number(caseId);
+                    return (this.payload.cases || []).find((item) => Number(item.id) === id) || null;
+                },
+
+                isQualitySurveyCompleted(caseKey) {
+                    if (String(caseKey) === 'general') {
+                        return true;
+                    }
+
+                    const caseData = this.caseById(caseKey);
+                    return Boolean(caseData?.quality_survey_completed);
+                },
+
+                blankQualityForm() {
+                    const defaults = this.payload.quality_survey_defaults || {};
+
+                    return {
+                        service_date: '',
+                        patient_identity_card: defaults.patient_identity_card || '',
+                        patient_full_name: defaults.patient_full_name || '',
+                        contact_channel: '',
+                        contact_channel_other: '',
+                        service_received: '',
+                        service_received_other: '',
+                        rating_attention_channels: '',
+                        rating_response_time: '',
+                        rating_medical_service: '',
+                        rating_overall_satisfaction: '',
+                        suggestions: '',
+                    };
+                },
+
+                matchServiceOption(services) {
+                    const options = this.payload.quality_survey_options?.services || [];
+                    const values = Array.isArray(services) ? services : [];
+
+                    for (const service of values) {
+                        const normalized = this.normalize(service);
+                        const match = options.find((option) => this.normalize(option) === normalized);
+                        if (match) {
+                            return match;
+                        }
+                    }
+
+                    return '';
+                },
+
+                openQualitySurvey(caseKey) {
+                    this.qcCase = this.caseById(caseKey);
+                    this.qcError = '';
+                    this.qcSubmitting = false;
+                    this.qcForm = this.blankQualityForm();
+                    this.qcForm.service_date = this.qcCase?.reference_date_key || '';
+                    this.qcForm.service_received = this.matchServiceOption(this.qcCase?.services || []);
+                    this.qcOpen = true;
+                    document.documentElement.classList.add('portal-qc-survey-lock');
+                },
+
+                closeQualitySurvey() {
+                    // El teclado virtual deja el viewport visual desplazado: si
+                    // no se cierra el foco y se devuelve el paneo horizontal a
+                    // cero, al volver a Documentos la lista aparece cortada por
+                    // la derecha aunque el layout sea correcto.
+                    if (document.activeElement instanceof HTMLElement) {
+                        document.activeElement.blur();
+                    }
+
+                    this.qcOpen = false;
+                    document.documentElement.classList.remove('portal-qc-survey-lock');
+                    window.requestAnimationFrame(() => window.scrollTo(0, window.scrollY));
+                    window.setTimeout(() => {
+                        if (!this.qcOpen) {
+                            this.qcCase = null;
+                            this.qcError = '';
+                            this.qcSubmitting = false;
+                            this.qcForm = this.blankQualityForm();
+                        }
+                    }, 220);
+                },
+
+                async submitQualitySurvey() {
+                    if (!this.qcCase?.id || this.qcSubmitting) {
+                        return;
+                    }
+
+                    this.qcSubmitting = true;
+                    this.qcError = '';
+
+                    const template = this.payload.quality_survey_complete_url_template || '';
+                    const url = template.replace('__CASE__', String(this.qcCase.id));
+
+                    try {
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': this.csrfToken(),
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({
+                                service_date: this.qcForm.service_date,
+                                patient_identity_card: this.qcForm.patient_identity_card,
+                                patient_full_name: this.qcForm.patient_full_name,
+                                contact_channel: this.qcForm.contact_channel,
+                                contact_channel_other: this.qcForm.contact_channel_other || null,
+                                service_received: this.qcForm.service_received,
+                                service_received_other: this.qcForm.service_received_other || null,
+                                rating_attention_channels: this.qcForm.rating_attention_channels,
+                                rating_response_time: this.qcForm.rating_response_time,
+                                rating_medical_service: this.qcForm.rating_medical_service,
+                                rating_overall_satisfaction: this.qcForm.rating_overall_satisfaction,
+                                suggestions: this.qcForm.suggestions || null,
+                            }),
+                        });
+
+                        // Sesión o token caducados: recargar es lo único que
+                        // devuelve un token válido, y así el usuario no ve un
+                        // error técnico que no puede resolver.
+                        if (response.status === 419 || response.status === 401) {
+                            this.qcError = '{{ __('Tu sesión expiró. Recargando…') }}';
+                            window.location.reload();
+
+                            return;
+                        }
+
+                        const data = await response.json().catch(() => ({}));
+
+                        if (!response.ok) {
+                            const firstError = data.errors
+                                ? Object.values(data.errors).flat()[0]
+                                : null;
+                            throw new Error(firstError || data.message || '{{ __('No se pudo registrar el cuestionario.') }}');
+                        }
+
+                        this.payload.cases = (this.payload.cases || []).map((item) => {
+                            if (Number(item.id) !== Number(this.qcCase.id)) {
+                                return item;
+                            }
+
+                            return {
+                                ...item,
+                                quality_survey_completed: true,
+                            };
+                        });
+
+                        const caseId = String(this.qcCase.id);
+                        this.closeQualitySurvey();
+                        this.openCaseIds = {
+                            ...this.openCaseIds,
+                            [caseId]: true,
+                        };
+                    } catch (error) {
+                        this.qcError = error?.message || '{{ __('No se pudo registrar el cuestionario.') }}';
+                        this.qcSubmitting = false;
+                    }
                 },
 
                 normalize(value) {
@@ -514,10 +870,15 @@
                         return !!manual;
                     }
 
-                    // Sin preferencia manual: con búsqueda activa se abren los casos con coincidencias.
+                    // Sin preferencia manual: con búsqueda activa se abren los casos con coincidencias
+                    // solo si el Quality Control del caso ya está completo (excepto generales).
                     if (this.hasActiveFilters() && !this.dateRangeInvalid()) {
                         if (key === 'general') {
                             return this.isGeneralSectionVisible();
+                        }
+
+                        if (!this.isQualitySurveyCompleted(key)) {
+                            return false;
                         }
 
                         return this.caseHasMatchingDocuments(key);
@@ -529,6 +890,11 @@
                 toggleCaseOpen(caseKey) {
                     const key = String(caseKey);
                     const next = !this.isCaseOpen(key);
+
+                    if (next && key !== 'general' && !this.isQualitySurveyCompleted(key)) {
+                        this.openQualitySurvey(key);
+                        return;
+                    }
 
                     // Reasignar el objeto para garantizar reactividad en Alpine.
                     this.openCaseIds = {

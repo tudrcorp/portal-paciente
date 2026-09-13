@@ -5,7 +5,11 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth portal-auth-html">
     <head>
-        @include('partials.head')
+        @include('partials.head', [
+            'themeColorLight' => '#3c6b72',
+            'themeColorDark' => '#35636b',
+            'statusBarStyle' => 'black-translucent',
+        ])
         <link rel="preload" as="image" href="{{ asset('images/porta-paciente-desktop.jpg') }}">
     </head>
     <body class="portal-liquid-root portal-auth-shell antialiased text-portal-ink dark:text-zinc-100">

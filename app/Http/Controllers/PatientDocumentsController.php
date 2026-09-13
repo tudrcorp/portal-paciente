@@ -42,6 +42,10 @@ class PatientDocumentsController extends Controller
                     'documents' => 0,
                     'patient_uploads' => 0,
                 ],
+                'qualitySurveyDefaults' => [
+                    'patient_identity_card' => '',
+                    'patient_full_name' => '',
+                ],
             ]);
         }
 
@@ -54,6 +58,10 @@ class PatientDocumentsController extends Controller
             'patientCases' => $payload['patientCases'],
             'filterOptions' => $payload['filterOptions'],
             'summary' => $payload['summary'],
+            'qualitySurveyDefaults' => $payload['qualitySurveyDefaults'] ?? [
+                'patient_identity_card' => (string) ($user->nro_identificacion ?? ''),
+                'patient_full_name' => (string) ($user->full_name ?? ''),
+            ],
         ]);
     }
 
@@ -72,18 +80,30 @@ class PatientDocumentsController extends Controller
         TelemedicinePatient $patient,
         string $source,
         int $id,
-    ): StreamedResponse|BinaryFileResponse {
-        [$relativePath, $downloadName] = match ($source) {
-            'patient_upload' => $this->resolvePatientUpload($patient, $id),
-            'telemedicine_document' => $this->resolveTelemedicineDocument($patient, $id),
-            default => $this->resolveCatalogDocument($patient, $source, $id),
-        };
+    ): StreamedResponse|\Symfony\Component\HttpFoundation\BinaryFileResponse {
+        [$relativePath, $downloadName, $caseId] = $this->resolveDownloadMetaFromDatabase($patient, $source, $id);
+        app(\App\Services\PortalData\QualitySurveyGateway::class)->assertCompletedOrAbort($patient, $caseId);
 
         return ClinicalDocumentStorage::download($relativePath, $downloadName);
     }
 
     /**
-     * @return array{0: string, 1: string}
+     * @return array{0: string, 1: string, 2: ?int}
+     */
+    public function resolveDownloadMetaFromDatabase(
+        TelemedicinePatient $patient,
+        string $source,
+        int $id,
+    ): array {
+        return match ($source) {
+            'patient_upload' => $this->resolvePatientUpload($patient, $id),
+            'telemedicine_document' => $this->resolveTelemedicineDocument($patient, $id),
+            default => $this->resolveCatalogDocument($patient, $source, $id),
+        };
+    }
+
+    /**
+     * @return array{0: string, 1: string, 2: ?int}
      */
     private function resolvePatientUpload(TelemedicinePatient $patient, int $id): array
     {
@@ -95,11 +115,15 @@ class PatientDocumentsController extends Controller
         $extension = pathinfo((string) $document->stored_filename, PATHINFO_EXTENSION);
         $downloadName = str($document->document_name)->slug('_').($extension ? '.'.$extension : '');
 
-        return [$document->storageRelativePath(), $downloadName];
+        return [
+            $document->storageRelativePath(),
+            $downloadName,
+            $document->telemedicine_case_id ? (int) $document->telemedicine_case_id : null,
+        ];
     }
 
     /**
-     * @return array{0: string, 1: string}
+     * @return array{0: string, 1: string, 2: ?int}
      */
     private function resolveTelemedicineDocument(TelemedicinePatient $patient, int $id): array
     {
@@ -110,11 +134,15 @@ class PatientDocumentsController extends Controller
 
         $relativePath = 'telemedicina-doc/'.ltrim((string) $document->name, '/');
 
-        return [$relativePath, basename((string) $document->name)];
+        return [
+            $relativePath,
+            basename((string) $document->name),
+            $document->telemedicine_case_id ? (int) $document->telemedicine_case_id : null,
+        ];
     }
 
     /**
-     * @return array{0: string, 1: string}
+     * @return array{0: string, 1: string, 2: ?int}
      */
     private function resolveCatalogDocument(TelemedicinePatient $patient, string $source, int $id): array
     {
@@ -128,6 +156,7 @@ class PatientDocumentsController extends Controller
                     return [
                         (string) $document['file_path'],
                         (string) $document['document_name'],
+                        (int) $case->getKey(),
                     ];
                 }
             }
@@ -138,6 +167,7 @@ class PatientDocumentsController extends Controller
                 return [
                     (string) $document['file_path'],
                     (string) $document['document_name'],
+                    null,
                 ];
             }
         }

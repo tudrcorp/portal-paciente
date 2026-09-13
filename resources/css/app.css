@@ -246,6 +246,8 @@
 
     .portal-surface-page {
         @apply min-h-svh flex-1 bg-portal-canvas text-portal-ink;
+        /* Respiro para el home indicator de iOS. */
+        padding-bottom: env(safe-area-inset-bottom, 0px);
     }
 
     .portal-focus-ring {
@@ -255,6 +257,14 @@
     /* Barra superior: misma identidad visual que la barra lateral */
     .portal-top-nav {
         @apply z-30 min-h-[3.75rem] items-center border-b border-white/10 px-3 py-1 text-white shadow-lg shadow-black/15 sm:px-4 lg:px-6;
+        /*
+         * El fondo de la barra sigue llegando al borde superior (pasa por
+         * detrás de la isla dinámica, como una app nativa), pero su contenido
+         * baja por debajo del área segura para que el logo y el botón de menú
+         * no queden tapados.
+         */
+        padding-top: calc(0.25rem + env(safe-area-inset-top, 0px));
+        min-height: calc(3.75rem + env(safe-area-inset-top, 0px));
         --portal-top-nav-control-size: 2.35rem;
         --portal-top-nav-action-gap: 0.75rem;
         --portal-top-nav-theme-help-gap: 1.125rem;
@@ -5034,13 +5044,27 @@ html.portal-auth-html {
     height: -webkit-fill-available;
 }
 
+/*
+ * Color del lienzo del documento. iOS lo usa para pintar lo que queda FUERA
+ * del área de contenido (franja del home indicator en modo standalone, rebote
+ * de scroll). Coincide con el borde inferior de la foto ya velada, así la
+ * franja se funde con la imagen en vez de cortarla.
+ * El borde superior lo cubre <meta name="theme-color">, ver partials/head.
+ */
+html.portal-auth-html,
 html.portal-auth-html body.portal-auth-shell,
 html body.portal-auth-shell {
     min-height: 100%;
     min-height: 100dvh;
-    min-height: -webkit-fill-available;
-    background-color: #0b3d5c !important;
+    background-color: #0e2f3a !important;
     overflow-x: hidden;
+    /* Sin rebote elástico: se comporta como una pantalla nativa. */
+    overscroll-behavior-y: none;
+}
+
+html.dark.portal-auth-html,
+html.dark body.portal-auth-shell {
+    background-color: #0d2b3a !important;
 }
 
 .portal-auth-shell.portal-liquid-root::before,
@@ -5050,35 +5074,24 @@ html body.portal-auth-shell {
 
 .portal-auth-backdrop {
     position: fixed;
-    inset: 0;
+    top: 0;
+    left: 0;
+    right: 0;
     z-index: -10;
-    width: 100%;
-    width: 100vw;
-    height: 100%;
-    height: 100vh;
-    height: 100dvh;
-    min-height: 100%;
-    min-height: 100svh;
-    min-height: 100dvh;
-    min-height: 100lvh;
-    min-height: -webkit-fill-available;
     overflow: hidden;
-    /* Extra bleed bajo la barra de Safari / home indicator en iOS */
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    box-sizing: border-box;
+    background-color: #0e2f3a;
+    /*
+     * Se ancla al viewport MÁS GRANDE (lvh) y se desborda por debajo del home
+     * indicator: así no aparece franja ni al ocultarse las barras del
+     * navegador ni en el área segura inferior de iOS.
+     */
+    height: 100vh;
+    height: calc(100lvh + env(safe-area-inset-bottom, 0px) + 2px);
+    min-height: calc(100dvh + env(safe-area-inset-bottom, 0px) + 2px);
 }
 
-@supports (-webkit-touch-callout: none) {
-    .portal-auth-backdrop {
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        width: 100%;
-        height: calc(100lvh + env(safe-area-inset-bottom, 0px) + 2px);
-        min-height: calc(100lvh + env(safe-area-inset-bottom, 0px) + 2px);
-        min-height: -webkit-fill-available;
-    }
+html.dark .portal-auth-backdrop {
+    background-color: #0d2b3a;
 }
 
 .portal-auth-backdrop__image {
@@ -5477,4 +5490,423 @@ html.dark .auth-portal-slot [data-flux-input] .text-zinc-400 {
 
 html.dark .auth-portal-slot [data-flux-error] {
     color: rgb(252 165 165) !important;
+}
+
+/* Quality Control survey gate (Documentos por caso) */
+html.portal-qc-survey-lock,
+html.portal-qc-survey-lock body {
+    overflow: hidden;
+    overscroll-behavior: none;
+}
+
+.portal-qc-survey {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.portal-qc-survey > * {
+    pointer-events: auto;
+}
+
+.portal-qc-survey__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(3 20 40 / 0.52);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+}
+
+.portal-qc-survey__sheet {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 28rem;
+    max-height: min(92dvh, 36rem);
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    padding: 0.55rem 1.1rem calc(1.15rem + env(safe-area-inset-bottom, 0px));
+    border-radius: 1.25rem 1.25rem 0 0;
+    border: 1px solid rgb(255 255 255 / 0.55);
+    background: rgb(255 255 255 / 0.98);
+    box-shadow: 0 -12px 40px rgb(4 51 90 / 0.18);
+    overflow: auto;
+    transform: translateY(0);
+}
+
+.portal-qc-survey__sheet--form {
+    max-width: min(36rem, 100%);
+    max-height: min(94dvh, 46rem);
+}
+
+.portal-qc-survey__form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    min-height: 0;
+}
+
+.portal-qc-survey__fields {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.portal-qc-survey__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 650;
+    color: var(--color-portal-ink);
+}
+
+html.dark .portal-qc-survey__field {
+    color: #e8f1f8;
+}
+
+.portal-qc-survey__field input,
+.portal-qc-survey__field select,
+.portal-qc-survey__field textarea {
+    width: 100%;
+    min-height: 2.55rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: 0.75rem;
+    border: 1px solid rgb(4 51 90 / 0.14);
+    background: rgb(255 255 255 / 0.92);
+    color: var(--color-portal-ink);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.portal-qc-survey__field textarea {
+    min-height: 5rem;
+    resize: vertical;
+}
+
+html.dark .portal-qc-survey__field input,
+html.dark .portal-qc-survey__field select,
+html.dark .portal-qc-survey__field textarea {
+    border-color: rgb(154 188 224 / 0.22);
+    background: rgb(8 34 56 / 0.92);
+    color: #f4f8fc;
+}
+
+.portal-qc-survey__fieldset {
+    margin: 0;
+    padding: 0.75rem 0.85rem;
+    border-radius: 0.9rem;
+    border: 1px solid rgb(4 51 90 / 0.1);
+    background: rgb(4 51 90 / 0.03);
+}
+
+html.dark .portal-qc-survey__fieldset {
+    border-color: rgb(154 188 224 / 0.16);
+    background: rgb(154 188 224 / 0.05);
+}
+
+.portal-qc-survey__fieldset legend {
+    padding: 0 0.2rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--color-portal-ink);
+}
+
+html.dark .portal-qc-survey__fieldset legend {
+    color: #e8f1f8;
+}
+
+.portal-qc-survey__choice {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    margin-top: 0.45rem;
+    font-size: 0.86rem;
+    font-weight: 500;
+    color: var(--color-portal-muted);
+    cursor: pointer;
+}
+
+.portal-qc-survey__choice input {
+    margin-top: 0.15rem;
+}
+
+.portal-qc-survey__sheet--enter {
+    transform: translateY(110%);
+}
+
+.portal-qc-survey__sheet--entered {
+    transform: translateY(0);
+}
+
+.portal-qc-survey-enter {
+    transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.portal-qc-survey-leave {
+    transition: transform 200ms ease-in;
+}
+
+html.dark .portal-qc-survey__sheet {
+    border-color: rgb(154 188 224 / 0.18);
+    background: rgb(6 28 48 / 0.98);
+}
+
+.portal-qc-survey__handle {
+    width: 2.4rem;
+    height: 0.28rem;
+    margin: 0.15rem auto 0.1rem;
+    border-radius: 999px;
+    background: rgb(4 51 90 / 0.18);
+}
+
+html.dark .portal-qc-survey__handle {
+    background: rgb(154 188 224 / 0.28);
+}
+
+.portal-qc-survey__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.portal-qc-survey__eyebrow {
+    margin: 0;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #1d6fa8;
+}
+
+.portal-qc-survey__title {
+    margin: 0.2rem 0 0;
+    font-size: 1.12rem;
+    font-weight: 700;
+    color: var(--color-portal-ink);
+}
+
+html.dark .portal-qc-survey__title {
+    color: #f4f8fc;
+}
+
+.portal-qc-survey__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.1rem;
+    height: 2.1rem;
+    border-radius: 999px;
+    border: 1px solid rgb(4 51 90 / 0.12);
+    background: rgb(4 51 90 / 0.04);
+    color: var(--color-portal-muted);
+    cursor: pointer;
+}
+
+.portal-qc-survey__copy {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.45;
+    color: var(--color-portal-muted);
+}
+
+.portal-qc-survey__case {
+    margin-top: 0.75rem;
+    padding: 0.7rem 0.85rem;
+    border-radius: 0.85rem;
+    border: 1px solid rgb(4 51 90 / 0.1);
+    background: rgb(4 51 90 / 0.04);
+}
+
+.portal-qc-survey__case-label {
+    margin: 0;
+    font-size: 0.7rem;
+    font-weight: 650;
+    color: var(--color-portal-muted);
+}
+
+.portal-qc-survey__case-code {
+    margin: 0.2rem 0 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-portal-ink);
+}
+
+html.dark .portal-qc-survey__case-code {
+    color: #f4f8fc;
+}
+
+.portal-qc-survey__error {
+    margin: 0.65rem 0 0;
+    font-size: 0.8rem;
+    color: #b91c1c;
+}
+
+.portal-qc-survey__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.portal-qc-survey__open,
+.portal-qc-survey__confirm,
+.portal-qc-survey__cancel {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    min-height: 2.75rem;
+    padding: 0.65rem 0.9rem;
+    border-radius: 0.85rem;
+    font-size: 0.88rem;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.portal-qc-survey__open {
+    border: 1px solid rgb(29 111 168 / 0.28);
+    background: rgb(29 111 168 / 0.1);
+    color: #0f4f7a;
+}
+
+.portal-qc-survey__confirm {
+    border: 1px solid rgb(37 211 102 / 0.35);
+    background: #25d366;
+    color: #04301a;
+}
+
+.portal-qc-survey__confirm:disabled {
+    opacity: 0.65;
+    cursor: wait;
+}
+
+.portal-qc-survey__cancel {
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--color-portal-muted);
+}
+
+@media (min-width: 640px) {
+    .portal-qc-survey {
+        align-items: center;
+        padding: 1.25rem;
+    }
+
+    .portal-qc-survey__sheet {
+        border-radius: 1.15rem;
+        box-shadow: 0 24px 60px rgb(4 51 90 / 0.22);
+    }
+
+    .portal-qc-survey__sheet--enter {
+        transform: translateY(1.25rem) scale(0.97);
+        opacity: 0;
+    }
+
+    .portal-qc-survey__sheet--entered {
+        transform: none;
+        opacity: 1;
+    }
+
+    .portal-qc-survey__handle {
+        display: none;
+    }
+}
+
+/*
+ * Comportamiento nativo en móvil
+ * ------------------------------
+ * iOS Safari hace zoom automático al enfocar un campo cuyo texto mide menos de
+ * 16px, y ese zoom rompe el layout (la página queda más ancha que la pantalla y
+ * se puede desplazar en horizontal). En vez de desactivar el pinch-to-zoom
+ * —que es un problema de accesibilidad— se garantiza el mínimo de 16px en los
+ * controles de formulario cuando el puntero es táctil.
+ */
+html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+/*
+ * `!important` es obligatorio aquí: esta regla apunta a elementos (0,0,1) y
+ * cualquier clase del diseño —`.portal-qc-survey__field textarea` (0.9rem),
+ * `.portal-documents-search__input` (0.92rem), `.portal-date-input` (0.875rem)
+ * o las clases de Flux— gana por especificidad y devuelve el campo por debajo
+ * de 16px. Ese era justamente el motivo de que iOS siguiera haciendo zoom al
+ * tocar el textarea de sugerencias del cuestionario y de que, tras enviarlo,
+ * la vista de Documentos quedara desbordada: el zoom del viewport visual no se
+ * deshace solo al perder el foco.
+ */
+@media (pointer: coarse) {
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']),
+    select,
+    textarea,
+    [contenteditable='true'] {
+        font-size: max(16px, 1em) !important;
+    }
+}
+
+/*
+ * Sin paneo horizontal
+ * --------------------
+ * En iOS un arrastre lateral sobre un sheet acaba desplazando el viewport
+ * visual y el diálogo entero se va de sitio. Se ataca por tres lados: el
+ * documento nunca desborda en horizontal, los sheets solo aceptan el gesto
+ * vertical (`pan-y`, conservando el pinch-to-zoom) y su scroll no se encadena
+ * con lo que hay detrás.
+ */
+/*
+ * `clip` y no `hidden`: `hidden` convertiría a <body> en contenedor de scroll y
+ * rompería el `position: sticky` de la barra superior.
+ */
+html,
+body {
+    max-width: 100%;
+    overflow-x: clip;
+}
+
+.portal-qc-survey,
+.portal-mobile-sheet {
+    touch-action: pan-y pinch-zoom;
+}
+
+.portal-qc-survey__sheet,
+.portal-mobile-sheet__panel {
+    overflow-x: hidden;
+    overflow-y: auto;
+    touch-action: pan-y pinch-zoom;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Nada dentro del cuestionario puede ensanchar el sheet. */
+.portal-qc-survey__form,
+.portal-qc-survey__fields,
+.portal-qc-survey__field,
+.portal-qc-survey__fieldset,
+.portal-qc-survey__choice {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.portal-qc-survey__field input,
+.portal-qc-survey__field select,
+.portal-qc-survey__field textarea {
+    max-width: 100%;
+}
+
+.portal-qc-survey__case-code {
+    overflow-wrap: anywhere;
+}
+
+.portal-qc-survey__choice span {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }

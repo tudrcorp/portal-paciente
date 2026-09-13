@@ -3,6 +3,7 @@
 use App\Http\Controllers\AppointmentServiceOrderWhatsAppController;
 use App\Http\Controllers\ClinicalHistoryController;
 use App\Http\Controllers\ClinicalHistoryOnboardingController;
+use App\Http\Controllers\CompleteCaseQualitySurveyController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MyProfileController;
 use App\Http\Controllers\OperationsHelpController;
@@ -16,6 +17,15 @@ use Livewire\Volt\Volt;
 Route::get('/', function () {
     return view('welcome');
 })->name('home');
+
+// Manifiesto PWA: se sirve por ruta para poder fijar el MIME correcto.
+Route::get('manifest.webmanifest', function () {
+    return response()
+        ->file(resource_path('manifest.webmanifest'), [
+            'Content-Type' => 'application/manifest+json; charset=utf-8',
+            'Cache-Control' => 'public, max-age=3600',
+        ]);
+})->name('manifest');
 
 // Recuperación de clave: accesible sin sesión (desde el login).
 Route::get('help', OperationsHelpController::class)->name('help');
@@ -33,6 +43,10 @@ Route::middleware(['auth', 'patient.history'])->group(function () {
         ->name('history.download');
 
     Route::get('cases', PatientDocumentsController::class)->name('cases.index');
+
+    Route::post('cases/{case}/quality-survey/complete', CompleteCaseQualitySurveyController::class)
+        ->whereNumber('case')
+        ->name('cases.quality-survey.complete');
 
     Route::post('cases/documents', StorePatientDocumentController::class)
         ->name('cases.documents.store');

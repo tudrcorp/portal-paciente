@@ -1,7 +1,11 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth">
     <head>
-        @include('partials.head')
+        @include('partials.head', [
+            'themeColorLight' => '#04335a',
+            'themeColorDark' => '#031e36',
+            'statusBarStyle' => 'black-translucent',
+        ])
     </head>
     <body class="portal-liquid-root min-h-screen bg-portal-canvas text-portal-ink antialiased">
         <flux:header sticky class="portal-top-nav">

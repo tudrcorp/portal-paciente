@@ -8,6 +8,7 @@ use App\Models\TelemedicineCase;
 use App\Models\TelemedicinePatient;
 use App\Models\TelemedicinePatientUploadedDocument;
 use App\Services\PortalApi\PortalApiClient;
+use App\Services\PortalApi\PortalApiException;
 use App\Support\ClinicalDocumentStorage;
 use App\Support\PatientDocumentsPresentation;
 use App\Support\PortalDataSource;
@@ -17,6 +18,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
  * Documentos/casos: listado, upload y download vía DB o API.
@@ -40,12 +42,26 @@ final class DocumentsGateway
         if (PortalDataSource::usesApi()) {
             // Normalizamos la respuesta del API a la forma que espera Blade
             // (uid, search_blob, date_key, types_label, etc.).
-            return $this->normalizeApiDocumentsPayload($this->api->documents(), $patient);
+            $normalized = $this->normalizeApiDocumentsPayload($this->api->documents(), $patient);
+            $normalized['qualitySurveyDefaults'] = [
+                'patient_identity_card' => (string) ($patient->nro_identificacion ?? ''),
+                'patient_full_name' => (string) ($patient->full_name ?? ''),
+            ];
+
+            return $normalized;
         }
 
         $payload = PatientDocumentsPresentation::build($patient);
+        $completedMap = app(QualitySurveyGateway::class)->completedMapFor($patient);
 
-        $patientCases = $payload['cases']->map(fn (array $case): array => [
+        $cases = $payload['cases']->map(function (array $case) use ($completedMap): array {
+            $caseId = (int) ($case['id'] ?? 0);
+            $case['quality_survey_completed'] = (bool) ($completedMap[$caseId] ?? false);
+
+            return $case;
+        });
+
+        $patientCases = $cases->map(fn (array $case): array => [
             'id' => $case['id'],
             'code' => $case['code'],
             'label' => collect([
@@ -57,11 +73,15 @@ final class DocumentsGateway
 
         return [
             'isPatient' => true,
-            'cases' => $payload['cases'],
+            'cases' => $cases,
             'generalDocuments' => $payload['general_documents'],
             'patientCases' => $patientCases,
             'filterOptions' => $payload['filter_options'],
             'summary' => $payload['summary'],
+            'qualitySurveyDefaults' => [
+                'patient_identity_card' => (string) ($patient->nro_identificacion ?? ''),
+                'patient_full_name' => (string) ($patient->full_name ?? ''),
+            ],
         ];
     }
 
@@ -129,7 +149,18 @@ final class DocumentsGateway
     public function download(TelemedicinePatient $patient, string $source, int $id): StreamedResponse|\Symfony\Component\HttpFoundation\Response
     {
         if (PortalDataSource::usesApi()) {
-            $response = $this->api->downloadDocument($source, $id);
+            try {
+                $response = $this->api->downloadDocument($source, $id);
+            } catch (PortalApiException $exception) {
+                if ($exception->status === 403) {
+                    abort(403, $exception->getMessage() ?: __('Debes completar el cuestionario de control de calidad de este caso antes de descargar documentos.'));
+                }
+
+                throw $exception;
+            } catch (HttpException $exception) {
+                throw $exception;
+            }
+
             $disposition = $response->header('Content-Disposition') ?: 'attachment';
             $contentType = $response->header('Content-Type') ?: 'application/octet-stream';
 
@@ -141,9 +172,12 @@ final class DocumentsGateway
             ]);
         }
 
-        // Delegamos a la lógica original del controlador.
-        return app(\App\Http\Controllers\PatientDocumentsController::class)
-            ->downloadFromDatabase($patient, $source, $id);
+        // Modo DB: resolver path y gate por caso antes de servir.
+        $controller = app(\App\Http\Controllers\PatientDocumentsController::class);
+        [$relativePath, $downloadName, $caseId] = $controller->resolveDownloadMetaFromDatabase($patient, $source, $id);
+        app(QualitySurveyGateway::class)->assertCompletedOrAbort($patient, $caseId);
+
+        return ClinicalDocumentStorage::download($relativePath, $downloadName);
     }
 
     /**
@@ -201,6 +235,7 @@ final class DocumentsGateway
                 'services_label' => $services !== [] ? implode(', ', $services) : __('Sin servicio registrado'),
                 'documents' => $documents,
                 'document_count' => count($documents),
+                'quality_survey_completed' => (bool) ($case['quality_survey_completed'] ?? false),
                 'search_blob' => mb_strtolower(implode(' ', array_filter([
                     $case['code'] ?? '',
                     $case['reason'] ?? '',

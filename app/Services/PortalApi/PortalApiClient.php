@@ -185,6 +185,25 @@ final class PortalApiClient
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    public function qualitySurveyStatus(int $caseId): array
+    {
+        return $this->unwrap($this->baseRequest()->get("/api/cases/{$caseId}/quality-survey"));
+    }
+
+    /**
+     * @param  array<string, mixed>  $answers
+     * @return array<string, mixed>
+     */
+    public function completeQualitySurvey(int $caseId, array $answers = []): array
+    {
+        return $this->unwrap(
+            $this->baseRequest()->post("/api/cases/{$caseId}/quality-survey/complete", $answers)
+        );
+    }
+
+    /**
      * Citas médicas operativas (operation_medical_appointments).
      *
      * @return array<string, mixed>
