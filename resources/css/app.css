@@ -2119,6 +2119,14 @@
         background: linear-gradient(145deg, #0a4578 0%, #04335a 100%);
     }
 
+    .portal-nav-pills__item--nearby {
+        background: linear-gradient(160deg, rgb(12 68 104 / 0.98) 0%, rgb(5 40 70 / 0.98) 100%);
+    }
+
+    .portal-nav-pills__item--nearby .portal-nav-pills__icon {
+        background: linear-gradient(145deg, #2f7de1 0%, #1d4f94 100%);
+    }
+
     .portal-nav-pills__item--notifications {
         background: linear-gradient(160deg, rgb(18 56 92 / 0.98) 0%, rgb(6 34 58 / 0.98) 100%);
     }
@@ -2161,6 +2169,10 @@
 
     .portal-nav-pills__item--documents.is-current {
         background: linear-gradient(135deg, #5b92c4 0%, #2f5f8a 100%);
+    }
+
+    .portal-nav-pills__item--nearby.is-current {
+        background: linear-gradient(135deg, #2f7de1 0%, #1d4f94 100%);
     }
 
     .portal-nav-pills__item--notifications.is-current {

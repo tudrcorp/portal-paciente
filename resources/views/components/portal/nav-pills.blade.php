@@ -17,6 +17,14 @@
             'tone' => 'documents',
         ],
         [
+            'label' => __('Cerca de mí'),
+            'subtitle' => __('Centros de salud'),
+            'href' => route('nearby.index'),
+            'current' => request()->routeIs('nearby.*'),
+            'icon' => 'map-pin',
+            'tone' => 'nearby',
+        ],
+        [
             'label' => __('Notificaciones'),
             'subtitle' => __('Recordatorios y avisos'),
             'href' => route('notifications.index'),

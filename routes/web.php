@@ -6,6 +6,10 @@ use App\Http\Controllers\ClinicalHistoryOnboardingController;
 use App\Http\Controllers\CompleteCaseQualitySurveyController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MyProfileController;
+use App\Http\Controllers\Nearby\NearbyAddressController;
+use App\Http\Controllers\Nearby\NearbyPlacesController;
+use App\Http\Controllers\Nearby\NearbyRouteController;
+use App\Http\Controllers\NearbyController;
 use App\Http\Controllers\OperationsHelpController;
 use App\Http\Controllers\PatientDocumentsController;
 use App\Http\Controllers\PatientNotificationController;
@@ -56,6 +60,18 @@ Route::middleware(['auth', 'patient.history'])->group(function () {
         ->name('cases.documents.download');
 
     Route::get('my-profile', MyProfileController::class)->name('my-profile.show');
+
+    // Geolocalización de centros de salud. Las consultas pasan por el servidor
+    // para cachear, ocultar credenciales del proveedor y respetar la cuota de
+    // las APIs públicas; el acelerador evita que un cliente con un bucle mal
+    // hecho agote esa cuota para todos.
+    Route::get('nearby', NearbyController::class)->name('nearby.index');
+
+    Route::middleware('throttle:60,1')->prefix('nearby')->name('nearby.')->group(function () {
+        Route::get('places', NearbyPlacesController::class)->name('places');
+        Route::get('route', NearbyRouteController::class)->name('route');
+        Route::get('address', NearbyAddressController::class)->name('address');
+    });
 });
 
 Route::middleware(['auth'])->group(function () {
@@ -75,7 +91,6 @@ Route::middleware(['auth', 'patient.history'])->prefix('notifications')->name('n
     Route::delete('{reminder}', [PatientNotificationController::class, 'destroy'])->whereNumber('reminder')->name('destroy');
     Route::patch('{reminder}/toggle', [PatientNotificationController::class, 'toggle'])->whereNumber('reminder')->name('toggle');
 });
-
 
 if (app()->environment('local')) {
     Route::get('/__preview-my-profile', function (\Illuminate\Http\Request $request) {

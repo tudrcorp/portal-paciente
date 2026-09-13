@@ -121,6 +121,19 @@
                     <a
                         @class([
                             'portal-mobile-sheet__item',
+                            'is-current' => request()->routeIs('nearby.*'),
+                        ])
+                        href="{{ route('nearby.index') }}"
+                        wire:navigate
+                        @click="hide()"
+                    >
+                        <flux:icon name="map-pin" class="size-5 shrink-0" />
+                        <span>{{ __('Cerca de mí') }}</span>
+                    </a>
+
+                    <a
+                        @class([
+                            'portal-mobile-sheet__item',
                             'is-current' => request()->routeIs('notifications.*'),
                         ])
                         href="{{ route('notifications.index') }}"

@@ -1,0 +1,944 @@
+/* -----------------------------------------------------------------------------
+   Cerca de mí — mapa de centros de salud
+
+   CSS plano a propósito: esta hoja viaja en el chunk asíncrono del mapa, no en
+   el bundle global. Usa los tokens del portal (definidos en app.css), así que
+   hereda el tema claro/oscuro sin duplicar la paleta.
+----------------------------------------------------------------------------- */
+
+html.portal-geo-lock,
+html.portal-geo-lock body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+}
+
+.portal-geo {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - var(--portal-geo-top, 60px));
+    height: calc(100dvh - var(--portal-geo-top, 60px));
+    overflow: hidden;
+    background: var(--color-portal-canvas);
+    isolation: isolate;
+}
+
+.portal-geo__map {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: var(--color-portal-subtle);
+}
+
+/* El mapa es el fondo de la pantalla: sin foco visible propio, el teclado
+   sigue alcanzando los controles de Leaflet. */
+.portal-geo__map:focus {
+    outline: none;
+}
+
+/* ------------------------------------------------------------------ Overlay */
+
+.portal-geo__overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.portal-geo__fab {
+    position: absolute;
+    top: 0.875rem;
+    right: 0.875rem;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 999px;
+    border: 1px solid color-mix(in oklab, var(--color-portal-border-soft) 70%, transparent);
+    background: color-mix(in oklab, var(--color-portal-surface) 88%, transparent);
+    color: var(--color-portal-primary);
+    box-shadow: 0 6px 18px rgb(3 30 54 / 0.18);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    backdrop-filter: blur(14px) saturate(160%);
+    pointer-events: auto;
+    cursor: pointer;
+    transition: transform var(--portal-duration-fast) var(--portal-ease-out),
+        background-color var(--portal-duration-fast) var(--portal-ease-out);
+}
+
+.portal-geo__fab:hover {
+    background: var(--color-portal-surface);
+}
+
+.portal-geo__fab:active {
+    transform: scale(0.94);
+}
+
+.portal-geo__area {
+    position: absolute;
+    top: 0.875rem;
+    left: 50%;
+    translate: -50% 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.9rem;
+    border: 0;
+    border-radius: 999px;
+    background: var(--color-portal-navy);
+    color: #fff;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    box-shadow: 0 8px 22px rgb(3 30 54 / 0.32);
+    pointer-events: auto;
+    cursor: pointer;
+    animation: portal-geo-drop var(--portal-duration-base) var(--portal-ease-ios-spring) both;
+}
+
+.portal-geo__area[hidden] {
+    display: none;
+}
+
+@keyframes portal-geo-drop {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+}
+
+/* -------------------------------------------------------------------- Panel */
+
+.portal-geo__sheet {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    height: min(92%, 92dvh);
+    border-radius: 1.5rem 1.5rem 0 0;
+    border-top: 1px solid color-mix(in oklab, var(--color-portal-border-soft) 80%, transparent);
+    background: color-mix(in oklab, var(--color-portal-surface) 94%, transparent);
+    -webkit-backdrop-filter: blur(var(--portal-glass-blur-mobile, 14px)) saturate(170%);
+    backdrop-filter: blur(var(--portal-glass-blur-mobile, 14px)) saturate(170%);
+    box-shadow: 0 -14px 44px rgb(3 30 54 / 0.24);
+    /* El panel se mueve con transform; avisar al compositor evita el tirón
+       del primer frame del arrastre. `touch-action` se restringe solo en la
+       zona de arrastre: ponerlo aquí dejaría el listado sin scroll táctil. */
+    will-change: transform;
+}
+
+.portal-geo__grab {
+    flex: none;
+    cursor: grab;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.portal-geo__grab:active {
+    cursor: grabbing;
+}
+
+.portal-geo__handle {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    padding: 0.625rem 0 0.25rem;
+    border: 0;
+    background: none;
+    cursor: inherit;
+}
+
+.portal-geo__handle span {
+    display: block;
+    width: 2.5rem;
+    height: 0.25rem;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--color-portal-muted) 45%, transparent);
+}
+
+.portal-geo__origin {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.375rem 1rem 0.875rem;
+}
+
+.portal-geo__origin-icon {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    flex: none;
+    border-radius: 999px;
+    background: var(--color-portal-primary-soft);
+    color: var(--color-portal-primary);
+}
+
+.portal-geo__origin-copy {
+    min-width: 0;
+    flex: 1;
+}
+
+.portal-geo__origin-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-portal-muted);
+}
+
+.portal-geo__origin-value {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--color-portal-ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.portal-geo__accuracy {
+    flex: none;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    background: var(--color-portal-success-soft);
+    color: var(--color-portal-success);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.portal-geo__accuracy.is-coarse {
+    background: var(--color-portal-warning-soft);
+    color: var(--color-portal-warning);
+}
+
+.portal-geo__collapse {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    border: 1px solid color-mix(in oklab, var(--color-portal-border-soft) 80%, transparent);
+    background: var(--color-portal-subtle);
+    color: var(--color-portal-muted);
+    cursor: pointer;
+    transition: background-color var(--portal-duration-fast) var(--portal-ease-out),
+        color var(--portal-duration-fast) var(--portal-ease-out);
+}
+
+.portal-geo__collapse:hover {
+    background: var(--color-portal-primary-soft);
+    color: var(--color-portal-primary);
+}
+
+.portal-geo__collapse svg {
+    transition: rotate var(--portal-duration-base) var(--portal-ease-ios-spring);
+}
+
+/* Plegado: la flecha apunta hacia arriba para invitar a desplegar. */
+.portal-geo__sheet.is-collapsed .portal-geo__collapse svg {
+    rotate: 180deg;
+}
+
+.portal-geo__panel {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 1rem calc(1.25rem + env(safe-area-inset-bottom, 0px));
+    touch-action: pan-y;
+}
+
+/* ------------------------------------------------------------------ Filtros */
+
+.portal-geo__field + .portal-geo__field {
+    margin-top: 0.875rem;
+}
+
+.portal-geo__field-label {
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-portal-muted);
+}
+
+.portal-geo__chips {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 0.25rem;
+    /* El carrusel de categorías se desliza en horizontal sin robarle el
+       scroll vertical al panel. */
+    scroll-snap-type: x proximity;
+}
+
+.portal-geo__chips::-webkit-scrollbar {
+    display: none;
+}
+
+.portal-geo__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex: none;
+    padding: 0.45rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid color-mix(in oklab, var(--color-portal-border-soft) 85%, transparent);
+    background: var(--color-portal-subtle);
+    color: var(--color-portal-ink);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    scroll-snap-align: start;
+    transition: background-color var(--portal-duration-fast) var(--portal-ease-out),
+        border-color var(--portal-duration-fast) var(--portal-ease-out),
+        color var(--portal-duration-fast) var(--portal-ease-out);
+}
+
+.portal-geo__chip:hover {
+    border-color: var(--color-portal-primary);
+}
+
+.portal-geo__chip.is-active {
+    background: var(--color-portal-navy);
+    border-color: var(--color-portal-navy);
+    color: #fff;
+}
+
+.portal-geo__chip-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: var(--chip-dot, var(--color-portal-primary));
+}
+
+.portal-geo__chip--pharmacy .portal-geo__chip-dot { --chip-dot: #1f8a5f; }
+.portal-geo__chip--hospital .portal-geo__chip-dot { --chip-dot: #c8443c; }
+.portal-geo__chip--clinic .portal-geo__chip-dot { --chip-dot: #4474a3; }
+.portal-geo__chip--ambulatory .portal-geo__chip-dot { --chip-dot: #b07a1e; }
+
+.portal-geo__segmented {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    border-radius: 0.875rem;
+    background: var(--color-portal-subtle);
+    border: 1px solid color-mix(in oklab, var(--color-portal-border-soft) 70%, transparent);
+}
+
+.portal-geo__segment {
+    padding: 0.5rem 0.25rem;
+    border: 0;
+    border-radius: 0.625rem;
+    background: transparent;
+    color: var(--color-portal-muted);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: background-color var(--portal-duration-fast) var(--portal-ease-out),
+        color var(--portal-duration-fast) var(--portal-ease-out);
+}
+
+.portal-geo__segment.is-active {
+    background: var(--color-portal-surface);
+    color: var(--color-portal-ink);
+    box-shadow: 0 2px 6px rgb(3 30 54 / 0.12);
+}
+
+.portal-geo__count {
+    margin: 0.875rem 0 0.5rem;
+    font-size: 0.75rem;
+    color: var(--color-portal-muted);
+}
+
+.portal-geo__count:empty {
+    margin: 0;
+}
+
+/* ----------------------------------------------------------------- Listado */
+
+.portal-geo__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.portal-geo__list[hidden] {
+    display: none;
+}
+
+.portal-geo__item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.625rem 0.5rem;
+    border: 0;
+    border-radius: 0.875rem;
+    background: transparent;
+    text-align: start;
+    cursor: pointer;
+    transition: background-color var(--portal-duration-fast) var(--portal-ease-out);
+}
+
+.portal-geo__item:hover,
+.portal-geo__item:focus-visible {
+    background: var(--color-portal-subtle);
+}
+
+.portal-geo__item-icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.75rem;
+    background: color-mix(in oklab, var(--pin-color, var(--color-portal-primary)) 16%, transparent);
+    color: var(--pin-color, var(--color-portal-primary));
+}
+
+.portal-geo__item-copy {
+    display: grid;
+    gap: 0.1rem;
+    min-width: 0;
+    flex: 1;
+}
+
+.portal-geo__item-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-portal-ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.portal-geo__item-meta {
+    font-size: 0.75rem;
+    color: var(--color-portal-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.portal-geo__item-distance {
+    flex: none;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--color-portal-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------------ Detalle */
+
+.portal-geo__detail[hidden] {
+    display: none;
+}
+
+.portal-geo__back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.75rem;
+    padding: 0.35rem 0;
+    border: 0;
+    background: none;
+    color: var(--color-portal-primary);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.portal-geo__detail-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.portal-geo__detail-name {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--color-portal-ink);
+}
+
+.portal-geo__detail-meta {
+    margin-top: 0.15rem;
+    font-size: 0.8125rem;
+    color: var(--color-portal-muted);
+}
+
+.portal-geo__detail-hours {
+    margin-top: 0.625rem;
+    font-size: 0.75rem;
+    color: var(--color-portal-muted);
+}
+
+.portal-geo__profiles {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 0.25rem;
+    margin-top: 0.875rem;
+    padding: 0.25rem;
+    border-radius: 0.875rem;
+    background: var(--color-portal-subtle);
+}
+
+.portal-geo__profile {
+    padding: 0.5rem;
+    border: 0;
+    border-radius: 0.625rem;
+    background: transparent;
+    color: var(--color-portal-muted);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.portal-geo__profile.is-active {
+    background: var(--color-portal-surface);
+    color: var(--color-portal-ink);
+    box-shadow: 0 2px 6px rgb(3 30 54 / 0.12);
+}
+
+.portal-geo__metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin-top: 0.875rem;
+    padding: 0.75rem 0;
+    border-block: 1px solid color-mix(in oklab, var(--color-portal-border-soft) 60%, transparent);
+}
+
+.portal-geo__metrics span {
+    display: block;
+    font-size: 0.6875rem;
+    color: var(--color-portal-muted);
+}
+
+.portal-geo__metrics strong {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-portal-ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.portal-geo__metrics.is-loading span,
+.portal-geo__metrics.is-loading strong {
+    border-radius: 0.375rem;
+    background: linear-gradient(
+        90deg,
+        color-mix(in oklab, var(--color-portal-muted) 12%, transparent) 25%,
+        color-mix(in oklab, var(--color-portal-muted) 22%, transparent) 50%,
+        color-mix(in oklab, var(--color-portal-muted) 12%, transparent) 75%
+    );
+    background-size: 200% 100%;
+    animation: portal-geo-shimmer 1.1s linear infinite;
+    color: transparent;
+}
+
+.portal-geo__metrics.is-loading span { width: 60%; height: 0.6rem; }
+.portal-geo__metrics.is-loading strong { width: 80%; height: 1rem; }
+
+@keyframes portal-geo-shimmer {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+}
+
+.portal-geo__actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.875rem;
+}
+
+.portal-geo__action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    padding: 0.7rem 1rem;
+    border-radius: 0.875rem;
+    border: 1px solid color-mix(in oklab, var(--color-portal-border-soft) 85%, transparent);
+    background: var(--color-portal-subtle);
+    color: var(--color-portal-ink);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background-color var(--portal-duration-fast) var(--portal-ease-out);
+}
+
+.portal-geo__action--primary {
+    background: var(--color-portal-navy);
+    border-color: var(--color-portal-navy);
+    color: #fff;
+}
+
+.portal-geo__action--primary:hover {
+    background: var(--color-portal-navy-hover);
+}
+
+/* ------------------------------------------------------------------ Estados */
+
+.portal-geo__notice {
+    display: grid;
+    gap: 0.35rem;
+    justify-items: start;
+    padding: 1rem;
+    margin-top: 0.5rem;
+    border-radius: 1rem;
+    background: var(--color-portal-subtle);
+    font-size: 0.8125rem;
+    color: var(--color-portal-muted);
+}
+
+.portal-geo__notice--inline {
+    margin-top: 0.875rem;
+}
+
+.portal-geo__notice--warn {
+    background: var(--color-portal-warning-soft);
+    color: var(--color-portal-warning);
+}
+
+.portal-geo__notice-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--color-portal-ink);
+}
+
+.portal-geo__notice--warn .portal-geo__notice-title {
+    color: inherit;
+}
+
+.portal-geo__notice-action {
+    margin-top: 0.25rem;
+    padding: 0.45rem 0.9rem;
+    border: 0;
+    border-radius: 999px;
+    background: var(--color-portal-navy);
+    color: #fff;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.portal-geo__spinner {
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 999px;
+    border: 2px solid color-mix(in oklab, var(--color-portal-primary) 30%, transparent);
+    border-top-color: var(--color-portal-primary);
+    animation: portal-geo-spin 0.8s linear infinite;
+}
+
+@keyframes portal-geo-spin {
+    to { rotate: 360deg; }
+}
+
+.portal-geo__skeleton {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.portal-geo__skeleton span {
+    height: 3.25rem;
+    border-radius: 0.875rem;
+    background: linear-gradient(
+        90deg,
+        color-mix(in oklab, var(--color-portal-muted) 10%, transparent) 25%,
+        color-mix(in oklab, var(--color-portal-muted) 18%, transparent) 50%,
+        color-mix(in oklab, var(--color-portal-muted) 10%, transparent) 75%
+    );
+    background-size: 200% 100%;
+    animation: portal-geo-shimmer 1.1s linear infinite;
+}
+
+/* ---------------------------------------------------------------- Escritorio */
+
+@media (min-width: 1024px) {
+    .portal-geo__sheet {
+        inset: 1rem auto 1rem 1rem;
+        width: 25rem;
+        height: auto;
+        border-radius: 1.25rem;
+        border: 1px solid color-mix(in oklab, var(--color-portal-border-soft) 80%, transparent);
+        box-shadow: 0 18px 50px rgb(3 30 54 / 0.22);
+        /* En escritorio es un panel fijo: el arrastre no aplica. */
+        transform: none !important;
+    }
+
+    .portal-geo__grab {
+        cursor: default;
+    }
+
+    .portal-geo__handle {
+        display: none;
+    }
+
+    .portal-geo__origin {
+        padding-top: 1rem;
+    }
+
+    /* En escritorio la columna no se arrastra: plegarla es recortarla a su
+       cabecera y devolverle al mapa todo el alto. */
+    .portal-geo__sheet.is-collapsed {
+        bottom: auto;
+        height: auto;
+    }
+
+    .portal-geo__sheet.is-collapsed .portal-geo__panel {
+        display: none;
+    }
+
+    .portal-geo__sheet.is-collapsed .portal-geo__origin {
+        padding-bottom: 1rem;
+    }
+
+    .portal-geo__fab {
+        top: auto;
+        bottom: 5.5rem;
+        right: 1.25rem;
+    }
+
+    .portal-geo__area {
+        left: calc(50% + 12.5rem);
+    }
+}
+
+@media (max-width: 1023px) {
+    /* La atribución vive abajo a la derecha, justo donde tapa el panel:
+       en móvil se recoloca arriba para seguir siendo visible. */
+    .portal-geo .leaflet-bottom.leaflet-right {
+        top: 0;
+        bottom: auto;
+        right: auto;
+        left: 0;
+    }
+
+    .portal-geo .leaflet-control-zoom {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .portal-geo *,
+    .portal-geo *::before,
+    .portal-geo *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* -----------------------------------------------------------------------------
+   Capas de Leaflet
+----------------------------------------------------------------------------- */
+
+.portal-geo .leaflet-container {
+    font: inherit;
+    background: var(--color-portal-subtle);
+}
+
+.portal-geo .leaflet-control-attribution {
+    padding: 0.15rem 0.45rem;
+    border-radius: 0.5rem;
+    background: color-mix(in oklab, var(--color-portal-surface) 82%, transparent);
+    color: var(--color-portal-muted);
+    font-size: 0.625rem;
+}
+
+.portal-geo .leaflet-control-attribution a {
+    color: var(--color-portal-primary);
+}
+
+.portal-geo .leaflet-control-zoom a {
+    border-color: color-mix(in oklab, var(--color-portal-border-soft) 70%, transparent);
+    background: color-mix(in oklab, var(--color-portal-surface) 90%, transparent);
+    color: var(--color-portal-ink);
+}
+
+/* El divIcon de Leaflet trae fondo y borde propios: aquí solo queremos el
+   contenido que dibujamos nosotros. */
+.portal-geo-marker {
+    background: none;
+    border: 0;
+}
+
+.portal-geo-pin {
+    display: grid;
+    place-items: start center;
+    width: 32px;
+    height: 40px;
+}
+
+.portal-geo-pin__body {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    border: 2px solid rgb(255 255 255 / 0.92);
+    background: var(--pin-color);
+    color: #fff;
+    box-shadow: 0 5px 12px rgb(3 30 54 / 0.4);
+    transition: transform var(--portal-duration-fast) var(--portal-ease-ios-spring),
+        box-shadow var(--portal-duration-fast) var(--portal-ease-out);
+}
+
+/* Punta del pin: ancla la burbuja al punto exacto del mapa. */
+.portal-geo-pin__body::after {
+    content: '';
+    position: absolute;
+    bottom: -7px;
+    left: 50%;
+    translate: -50% 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 8px solid var(--pin-color);
+    filter: drop-shadow(0 2px 1px rgb(3 30 54 / 0.25));
+}
+
+.portal-geo-marker.is-selected .portal-geo-pin__body {
+    transform: scale(1.2) translateY(-2px);
+    box-shadow: 0 0 0 7px color-mix(in oklab, var(--pin-color) 28%, transparent),
+        0 8px 18px rgb(3 30 54 / 0.45);
+}
+
+.portal-geo-user {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+}
+
+.portal-geo-user__dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    border: 2.5px solid #fff;
+    background: #2f7de1;
+    box-shadow: 0 2px 8px rgb(3 30 54 / 0.45);
+}
+
+.portal-geo-user__pulse {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    background: rgb(47 125 225 / 0.35);
+    animation: portal-geo-pulse 2.2s var(--portal-ease-out) infinite;
+}
+
+@keyframes portal-geo-pulse {
+    0% { transform: scale(0.6); opacity: 0.8; }
+    70% { transform: scale(2.4); opacity: 0; }
+    100% { transform: scale(2.4); opacity: 0; }
+}
+
+.portal-geo-accuracy {
+    fill: #2f7de1;
+    fill-opacity: 0.12;
+    stroke: #2f7de1;
+    stroke-opacity: 0.35;
+    stroke-width: 1;
+}
+
+.portal-geo-radius {
+    fill: var(--color-portal-primary);
+    fill-opacity: 0.05;
+    stroke: var(--color-portal-primary);
+    stroke-opacity: 0.35;
+    stroke-width: 1.5;
+    stroke-dasharray: 6 6;
+}
+
+/* Doble trazo: el inferior garantiza contraste sobre cualquier tesela. */
+.portal-geo-route {
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.portal-geo-route--casing {
+    stroke: #ffffff;
+    stroke-width: 9;
+    stroke-opacity: 0.95;
+}
+
+.portal-geo-route--line {
+    stroke: #2f7de1;
+    stroke-width: 5;
+    stroke-opacity: 1;
+}
+
+/* ------------------------------------------------------------- Tema oscuro */
+
+html.dark .portal-geo__sheet {
+    background: color-mix(in oklab, var(--color-portal-surface) 88%, transparent);
+    box-shadow: 0 -14px 44px rgb(0 0 0 / 0.45);
+}
+
+html.dark .portal-geo__fab,
+html.dark .portal-geo .leaflet-control-attribution,
+html.dark .portal-geo .leaflet-control-zoom a {
+    background: color-mix(in oklab, var(--color-portal-surface) 85%, transparent);
+}
+
+html.dark .portal-geo__segment.is-active,
+html.dark .portal-geo__profile.is-active {
+    background: color-mix(in oklab, var(--color-portal-primary) 22%, transparent);
+    box-shadow: none;
+}
+
+html.dark .portal-geo__chip.is-active {
+    background: var(--color-portal-primary);
+    border-color: var(--color-portal-primary);
+    color: var(--color-portal-navy);
+}
+
+html.dark .portal-geo__action--primary,
+html.dark .portal-geo__notice-action,
+html.dark .portal-geo__area {
+    background: var(--color-portal-primary);
+    border-color: var(--color-portal-primary);
+    color: var(--color-portal-navy);
+}
+
+html.dark .portal-geo-pin__body {
+    border-color: rgb(3 30 54 / 0.65);
+}
+
+html.dark .portal-geo-route--casing {
+    stroke: #031e36;
+    stroke-opacity: 0.85;
+}
+
+html.dark .portal-geo-route--line {
+    stroke: #9abce0;
+}
+
+html.dark .portal-geo-user__dot {
+    border-color: #031e36;
+    background: #9abce0;
+}
+
+html.dark .portal-geo-user__pulse {
+    background: rgb(154 188 224 / 0.3);
+}
