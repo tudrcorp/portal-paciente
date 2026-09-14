@@ -115,21 +115,15 @@ return [
     ],
 
     /*
-    | Teselas del mapa. CARTO sirve estilos gratuitos sobre datos de OSM y
-    | ofrece variante clara y oscura, que es lo que permite que el mapa siga
-    | el tema del portal. Al migrar a Google, este bloque deja de usarse.
+    | Teselas del mapa: servidor oficial de OpenStreetMap, gratuito y sin API
+    | key. Solo existe en estilo claro, así que la pantalla del mapa se fija en
+    | tema claro aunque el portal esté en oscuro (ver resources/css/nearby.css).
+    | Al migrar a Google, este bloque deja de usarse.
     */
     'tiles' => [
-        'light' => [
-            'url' => env('GEO_TILES_LIGHT', 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'),
-            'subdomains' => 'abcd',
-            'attribution' => '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        ],
-        'dark' => [
-            'url' => env('GEO_TILES_DARK', 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'),
-            'subdomains' => 'abcd',
-            'attribution' => '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        ],
+        'url' => env('GEO_TILES_URL', 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
+        'subdomains' => env('GEO_TILES_SUBDOMAINS', ''),
+        'attribution' => '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     ],
 
     // Encuadre inicial mientras el navegador resuelve el GPS (Caracas).

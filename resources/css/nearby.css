@@ -13,7 +13,34 @@ html.portal-geo-lock body {
     overscroll-behavior: none;
 }
 
+/* Las teselas de OpenStreetMap solo existen en estilo claro, así que esta
+   pantalla se ancla al tema claro aunque el portal esté en oscuro: redeclarar
+   aquí los tokens deja todo el subárbol coherente con el mapa, sin tocar el
+   tema del resto del portal. */
 .portal-geo {
+    color-scheme: light;
+
+    --color-portal-canvas: #dbe4ef;
+    --color-portal-surface: #ffffff;
+    --color-portal-subtle: #e8eef5;
+    --color-portal-border: #9abce0;
+    --color-portal-border-soft: #c4d4e6;
+    --color-portal-ink: #031e36;
+    --color-portal-muted: #4474a3;
+    --color-portal-primary: #4474a3;
+    --color-portal-primary-hover: #04335a;
+    --color-portal-primary-soft: #c4d4e6;
+    --color-portal-navy: #04335a;
+    --color-portal-navy-hover: #031e36;
+    --color-portal-success: #2f6f4f;
+    --color-portal-success-soft: #e4f0ea;
+    --color-portal-warning: #9a6b1f;
+    --color-portal-warning-soft: #f8f1e3;
+    --color-portal-danger: #9b2c2c;
+    --color-portal-danger-soft: #faeaea;
+
+    color: var(--color-portal-ink);
+
     position: relative;
     width: 100%;
     height: calc(100vh - var(--portal-geo-top, 60px));
@@ -886,59 +913,4 @@ html.portal-geo-lock body {
     stroke: #2f7de1;
     stroke-width: 5;
     stroke-opacity: 1;
-}
-
-/* ------------------------------------------------------------- Tema oscuro */
-
-html.dark .portal-geo__sheet {
-    background: color-mix(in oklab, var(--color-portal-surface) 88%, transparent);
-    box-shadow: 0 -14px 44px rgb(0 0 0 / 0.45);
-}
-
-html.dark .portal-geo__fab,
-html.dark .portal-geo .leaflet-control-attribution,
-html.dark .portal-geo .leaflet-control-zoom a {
-    background: color-mix(in oklab, var(--color-portal-surface) 85%, transparent);
-}
-
-html.dark .portal-geo__segment.is-active,
-html.dark .portal-geo__profile.is-active {
-    background: color-mix(in oklab, var(--color-portal-primary) 22%, transparent);
-    box-shadow: none;
-}
-
-html.dark .portal-geo__chip.is-active {
-    background: var(--color-portal-primary);
-    border-color: var(--color-portal-primary);
-    color: var(--color-portal-navy);
-}
-
-html.dark .portal-geo__action--primary,
-html.dark .portal-geo__notice-action,
-html.dark .portal-geo__area {
-    background: var(--color-portal-primary);
-    border-color: var(--color-portal-primary);
-    color: var(--color-portal-navy);
-}
-
-html.dark .portal-geo-pin__body {
-    border-color: rgb(3 30 54 / 0.65);
-}
-
-html.dark .portal-geo-route--casing {
-    stroke: #031e36;
-    stroke-opacity: 0.85;
-}
-
-html.dark .portal-geo-route--line {
-    stroke: #9abce0;
-}
-
-html.dark .portal-geo-user__dot {
-    border-color: #031e36;
-    background: #9abce0;
-}
-
-html.dark .portal-geo-user__pulse {
-    background: rgb(154 188 224 / 0.3);
 }

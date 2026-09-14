@@ -34,16 +34,11 @@ export function createMapController(element, config) {
     const markers = new Map();
     const placesLayer = L.layerGroup().addTo(map);
 
-    function isDark() {
-        return document.documentElement.classList.contains('dark');
-    }
-
+    // Un único estilo de teselas: OpenStreetMap no publica variante oscura, así
+    // que la pantalla se fija en tema claro y el mapa no depende del tema del
+    // portal. Sin esto haría falta una API key de un proveedor con estilo dark.
     function applyTiles() {
-        const source = isDark() ? config.tiles.dark : config.tiles.light;
-
-        if (tileLayer) {
-            map.removeLayer(tileLayer);
-        }
+        const source = config.tiles;
 
         tileLayer = L.tileLayer(source.url, {
             attribution: source.attribution,
@@ -57,10 +52,6 @@ export function createMapController(element, config) {
 
         tileLayer.getContainer()?.classList.add('portal-geo__tiles');
     }
-
-    // El portal permite cambiar de tema en caliente; el mapa debe seguirlo.
-    const themeObserver = new MutationObserver(() => applyTiles());
-    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
     applyTiles();
 
@@ -264,7 +255,6 @@ export function createMapController(element, config) {
         },
 
         destroy() {
-            themeObserver.disconnect();
             markers.clear();
             map.remove();
         },

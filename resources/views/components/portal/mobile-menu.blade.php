@@ -179,19 +179,6 @@
                         <flux:icon name="user-circle" class="size-5 shrink-0" />
                         <span>{{ __('Mi Perfil') }}</span>
                     </a>
-
-                    <a
-                        @class([
-                            'portal-mobile-sheet__item',
-                            'is-current' => request()->routeIs('profile.*', 'password.*', 'appearance.*', 'two-factor.*'),
-                        ])
-                        href="{{ route('profile.edit') }}"
-                        wire:navigate
-                        @click="hide()"
-                    >
-                        <flux:icon name="cog" class="size-5 shrink-0" />
-                        <span>{{ __('Ajustes') }}</span>
-                    </a>
                 </div>
 
                 <div class="portal-mobile-sheet__divider" role="separator"></div>
